@@ -1,18 +1,23 @@
 from __future__ import annotations
+
 import sqlite3
 import uuid
+from datetime import UTC, datetime
+
 import pandas as pd
-from datetime import datetime, timezone
+
 from .fetch import META_FIELDS
 
 DB_PATH = "bist100_prices.db"
+
 
 def init_db(db_path: str = DB_PATH):
     con = sqlite3.connect(db_path)
     cur = con.cursor()
 
     # Run log
-    cur.execute("""
+    cur.execute(
+        """
     CREATE TABLE IF NOT EXISTS runs (
         run_id TEXT PRIMARY KEY,
         started_at TEXT NOT NULL,
@@ -21,10 +26,12 @@ def init_db(db_path: str = DB_PATH):
         n_rows INTEGER NOT NULL,
         note TEXT
     );
-    """)
+    """
+    )
 
     # Prices table (unique bar per ticker/datetime_utc/interval)
-    cur.execute("""
+    cur.execute(
+        """
     CREATE TABLE IF NOT EXISTS prices (
         ticker TEXT NOT NULL,
         datetime_utc TEXT NOT NULL,
@@ -42,12 +49,14 @@ def init_db(db_path: str = DB_PATH):
         run_id TEXT NOT NULL,
         PRIMARY KEY (ticker, datetime_utc, interval)
     );
-    """)
+    """
+    )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_prices_ticker ON prices(ticker);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_prices_dt ON prices(datetime_utc);")
 
     # Meta table (symbol=PK)
-    cur.execute("""
+    cur.execute(
+        """
     CREATE TABLE IF NOT EXISTS meta (
         symbol TEXT PRIMARY KEY,
         currency TEXT,
@@ -75,18 +84,21 @@ def init_db(db_path: str = DB_PATH):
         ingested_at TEXT,
         run_id TEXT
     );
-    """)
+    """
+    )
 
     con.commit()
     con.close()
 
 
-def ingest_prices(df: pd.DataFrame,
-                  rng: str,
-                  interval: str,
-                  db_path: str = DB_PATH,
-                  run_id: Optional[str] = None,
-                  note: Optional[str] = None):
+def ingest_prices(
+    df: pd.DataFrame,
+    rng: str,
+    interval: str,
+    db_path: str = DB_PATH,
+    run_id: str | None = None,
+    note: str | None = None,
+):
     """
     Upsert DataFrame rows into SQLite with run logging.
     Expects df to have at least: ['ticker','datetime', 'open','high','low','close','volume','adjclose']
@@ -111,7 +123,11 @@ def ingest_prices(df: pd.DataFrame,
         # Assume naive = local; convert to UTC string (best-effort)
         dt_local = d["datetime"]
         dt_utc = pd.to_datetime(d["datetime"], utc=True).dt.tz_localize(None)
-        dt_tr = pd.to_datetime(d["datetime"], utc=True).dt.tz_convert("Europe/Istanbul").dt.tz_localize(None)
+        dt_tr = (
+            pd.to_datetime(d["datetime"], utc=True)
+            .dt.tz_convert("Europe/Istanbul")
+            .dt.tz_localize(None)
+        )
 
     d["datetime_utc"] = dt_utc.dt.strftime("%Y-%m-%d %H:%M:%S")
     d["datetime_local"] = dt_local.dt.strftime("%Y-%m-%d %H:%M:%S")
@@ -127,17 +143,30 @@ def ingest_prices(df: pd.DataFrame,
         d["range_str"] = rng
 
     # Add ingestion metadata
-    ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    ingested_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
     d["ingested_at"] = ingested_at
     d["run_id"] = run_id
 
     # Select/align columns for DB
     cols = [
-        "ticker","datetime_utc","datetime_local","datetime_tr",
-        "open","high","low","close","volume","adjclose",
-        "range_str","interval","ingested_at","run_id"
+        "ticker",
+        "datetime_utc",
+        "datetime_local",
+        "datetime_tr",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "adjclose",
+        "range_str",
+        "interval",
+        "ingested_at",
+        "run_id",
     ]
-    missing = [c for c in ["ticker","open","high","low","close","volume"] if c not in d.columns]
+    missing = [
+        c for c in ["ticker", "open", "high", "low", "close", "volume"] if c not in d.columns
+    ]
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
 
@@ -149,7 +178,8 @@ def ingest_prices(df: pd.DataFrame,
     con = sqlite3.connect(db_path)
     cur = con.cursor()
 
-    cur.executemany("""
+    cur.executemany(
+        """
         INSERT INTO prices (
             ticker, datetime_utc, datetime_local, datetime_tr,
             open, high, low, close, volume, adjclose,
@@ -166,21 +196,25 @@ def ingest_prices(df: pd.DataFrame,
             ingested_at=excluded.ingested_at,
             run_id=excluded.run_id
         ;
-    """, list(map(tuple, d_db.values)))
+    """,
+        list(map(tuple, d_db.values)),
+    )
 
     # Log the run
-    cur.execute("""
+    cur.execute(
+        """
         INSERT OR REPLACE INTO runs (run_id, started_at, rng, interval, n_rows, note)
         VALUES (?, ?, ?, ?, ?, ?);
-    """, (run_id, ingested_at, rng, interval, int(len(d_db)), note))
+    """,
+        (run_id, ingested_at, rng, interval, int(len(d_db)), note),
+    )
 
     con.commit()
     con.close()
     return run_id
 
-def ingest_meta(df_meta: pd.DataFrame,
-                db_path: str = DB_PATH,
-                run_id: Optional[str] = None):
+
+def ingest_meta(df_meta: pd.DataFrame, db_path: str = DB_PATH, run_id: str | None = None):
     con = sqlite3.connect(db_path)
     cur = con.cursor()
 
@@ -189,14 +223,15 @@ def ingest_meta(df_meta: pd.DataFrame,
     d = d.where(pd.notnull(d), None).astype(object)
 
     # ingest meta timestamp
-    ingested_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    ingested_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
     d["ingested_at"] = ingested_at
     d["run_id"] = run_id or "manual"
 
-    cols = META_FIELDS + ["ingested_at","run_id"]
+    cols = META_FIELDS + ["ingested_at", "run_id"]
     tuples = list(map(tuple, d[cols].values))
 
-    cur.executemany(f"""
+    cur.executemany(
+        f"""
         INSERT INTO meta ({",".join(cols)})
         VALUES ({",".join(["?"]*len(cols))})
         ON CONFLICT(symbol) DO UPDATE SET
@@ -225,7 +260,9 @@ def ingest_meta(df_meta: pd.DataFrame,
             ingested_at=excluded.ingested_at,
             run_id=excluded.run_id
         ;
-    """, tuples)
+    """,
+        tuples,
+    )
 
     con.commit()
     con.close()

@@ -1,24 +1,25 @@
 from __future__ import annotations
 
-import time
 import random
+import time
+from typing import Any
 from urllib.parse import urlencode
-from typing import Optional
 
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 import pandas as pd
+import requests
 
-from .session import _make_retry, get_yahoo_session
+from .session import get_yahoo_session
+
 
 # ---------- single-ticker fetch ----------
-def fetch_yahoo_chart(symbol: str,
-                      rng: str = "12d",
-                      interval: str = "5m",
-                      include_prepost: bool = False,
-                      timeout: int = 20,
-                      session: Optional[requests.Session] = None):
+def fetch_yahoo_chart(
+    symbol: str,
+    rng: str = "12d",
+    interval: str = "5m",
+    include_prepost: bool = False,
+    timeout: int = 20,
+    session: requests.Session | None = None,
+):
     """
     Robust Yahoo Finance chart fetch with cookie warm-up, retry, and host failover.
     Adds 'ticker' column.
@@ -28,7 +29,9 @@ def fetch_yahoo_chart(symbol: str,
 
     # warm-up cookies
     try:
-        sess.get(f"https://finance.yahoo.com/quote/{symbol}/chart", headers=headers, timeout=timeout)
+        sess.get(
+            f"https://finance.yahoo.com/quote/{symbol}/chart", headers=headers, timeout=timeout
+        )
     except Exception:
         pass
 
@@ -97,24 +100,25 @@ def fetch_yahoo_chart(symbol: str,
         df["adjclose"] = pd.NA
 
     df["ticker"] = symbol
-    df["range"] = rng         
+    df["range"] = rng
     df["interval"] = interval
 
     # Turkish local time
     try:
         df["datetime_tr"] = df["datetime"].dt.tz_convert("Europe/Istanbul")
     except Exception:
-        df["datetime_tr"] = pd.to_datetime(df["datetime"], utc=True).dt.tz_convert("Europe/Istanbul")
+        df["datetime_tr"] = pd.to_datetime(df["datetime"], utc=True).dt.tz_convert(
+            "Europe/Istanbul"
+        )
 
     df = df.sort_values("datetime").reset_index(drop=True)
     return df, meta
 
+
 # ---------- batch fetch ----------
-def fetch_batch(symbols,
-                rng: str = "12d",
-                interval: str = "5m",
-                sleep_min: float = 0.8,
-                sleep_max: float = 1.8):
+def fetch_batch(
+    symbols, rng: str = "12d", interval: str = "5m", sleep_min: float = 0.8, sleep_max: float = 1.8
+):
     sess = get_yahoo_session()
     frames, metas, errors = [], {}, {}
 
@@ -129,22 +133,44 @@ def fetch_batch(symbols,
             print(f"[{i}/{len(symbols)}] ERR {sym} -> {e}")
         time.sleep(random.uniform(sleep_min, sleep_max))
 
-    df_all = pd.concat(frames, ignore_index=True) if frames \
-             else pd.DataFrame(columns=["datetime","open","high","low","close","volume","adjclose","ticker"])
+    df_all = (
+        pd.concat(frames, ignore_index=True)
+        if frames
+        else pd.DataFrame(
+            columns=["datetime", "open", "high", "low", "close", "volume", "adjclose", "ticker"]
+        )
+    )
     return df_all, metas, errors
 
-from typing import Dict, Any
 
 META_FIELDS = [
-    "currency","symbol","exchangeName","fullExchangeName","instrumentType",
-    "firstTradeDate","regularMarketTime","hasPrePostMarketData","gmtoffset",
-    "timezone","exchangeTimezoneName","regularMarketPrice","fiftyTwoWeekHigh",
-    "fiftyTwoWeekLow","regularMarketDayHigh","regularMarketDayLow",
-    "regularMarketVolume","longName","shortName","chartPreviousClose",
-    "previousClose","scale","priceHint"
+    "currency",
+    "symbol",
+    "exchangeName",
+    "fullExchangeName",
+    "instrumentType",
+    "firstTradeDate",
+    "regularMarketTime",
+    "hasPrePostMarketData",
+    "gmtoffset",
+    "timezone",
+    "exchangeTimezoneName",
+    "regularMarketPrice",
+    "fiftyTwoWeekHigh",
+    "fiftyTwoWeekLow",
+    "regularMarketDayHigh",
+    "regularMarketDayLow",
+    "regularMarketVolume",
+    "longName",
+    "shortName",
+    "chartPreviousClose",
+    "previousClose",
+    "scale",
+    "priceHint",
 ]
 
-def metas_to_df(metas: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
+
+def metas_to_df(metas: dict[str, dict[str, Any]]) -> pd.DataFrame:
     rows = []
     for sym, m in metas.items():
         row = {k: m.get(k, None) for k in META_FIELDS}
@@ -155,18 +181,107 @@ def metas_to_df(metas: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
     dfm = dfm.where(pd.notnull(dfm), None).astype(object)
     return dfm
 
+
 # ---------- BIST100 ----------
 BIST_SUBSET = [
-    'BTCIM.IS', 'KOZAL.IS', 'VESTL.IS', 'TCELL.IS', 'KUYAS.IS', 'TTKOM.IS', 'PETKM.IS', 'MGROS.IS', 'SISE.IS',
-    'ENKAI.IS', 'ISMEN.IS', 'AKSEN.IS', 'TSKB.IS', 'HALKB.IS', 'YKBNK.IS', 'VAKBN.IS', 'DOAS.IS', 'ZOREN.IS', 
-    'DOHOL.IS', 'SKBNK.IS', 'GSRAY.IS', 'KOZAA.IS', 'TTRAK.IS', 'FENER.IS', 'TKFEN.IS', 'GARAN.IS', 'AKBNK.IS',
-    'CLEBI.IS', 'TOASO.IS', 'TUPRS.IS', 'BIMAS.IS', 'ANSGR.IS', 'FROTO.IS', 'ASELS.IS', 'KRDMD.IS', 'CIMSA.IS',
-    'BRSAN.IS', 'ODAS.IS', 'BSOKE.IS', 'KCHOL.IS', 'IPEKE.IS', 'CCOLA.IS', 'AEFES.IS', 'ULKER.IS', 'EGEEN.IS',
-    'BRYAT.IS', 'OTKAR.IS', 'THYAO.IS', 'ALARK.IS', 'HEKTS.IS', 'IEYHO.IS', 'SAHOL.IS', 'AKSA.IS', 'TAVHL.IS',
-    'PGSUS.IS', 'ARCLK.IS', 'SASA.IS', 'EREGL.IS', 'ISCTR.IS', 'EKGYO.IS', 'GUBRF.IS', 'MAVI.IS', 'BERA.IS',
-    'AGHOL.IS', 'ENJSA.IS', 'MPARK.IS', 'RALYH.IS', 'SOKM.IS', 'OYAKC.IS', 'TURSG.IS', 'KONTR.IS', 'TUREX.IS',
-    'CANTE.IS', 'GENIL.IS', 'GESAN.IS', 'YEOTK.IS', 'MAGEN.IS', 'MIATK.IS', 'GRSEL.IS', 'SMRTG.IS', 'KCAER.IS',
-    'ALFAS.IS', 'ASTOR.IS', 'EUPWR.IS', 'CWENE.IS', 'KTLEV.IS', 'PASEU.IS', 'ENERY.IS', 'REEDR.IS', 'TABGD.IS',
-    'BINHO.IS', 'AVPGY.IS', 'LMKDC.IS', 'OBAMS.IS', 'ALTNY.IS', 'EFORC.IS', 'GRTHO.IS', 'GLRMK.IS', 'DSTKF.IS', 
-    'BALSU.IS'
+    "BTCIM.IS",
+    "KOZAL.IS",
+    "VESTL.IS",
+    "TCELL.IS",
+    "KUYAS.IS",
+    "TTKOM.IS",
+    "PETKM.IS",
+    "MGROS.IS",
+    "SISE.IS",
+    "ENKAI.IS",
+    "ISMEN.IS",
+    "AKSEN.IS",
+    "TSKB.IS",
+    "HALKB.IS",
+    "YKBNK.IS",
+    "VAKBN.IS",
+    "DOAS.IS",
+    "ZOREN.IS",
+    "DOHOL.IS",
+    "SKBNK.IS",
+    "GSRAY.IS",
+    "KOZAA.IS",
+    "TTRAK.IS",
+    "FENER.IS",
+    "TKFEN.IS",
+    "GARAN.IS",
+    "AKBNK.IS",
+    "CLEBI.IS",
+    "TOASO.IS",
+    "TUPRS.IS",
+    "BIMAS.IS",
+    "ANSGR.IS",
+    "FROTO.IS",
+    "ASELS.IS",
+    "KRDMD.IS",
+    "CIMSA.IS",
+    "BRSAN.IS",
+    "ODAS.IS",
+    "BSOKE.IS",
+    "KCHOL.IS",
+    "IPEKE.IS",
+    "CCOLA.IS",
+    "AEFES.IS",
+    "ULKER.IS",
+    "EGEEN.IS",
+    "BRYAT.IS",
+    "OTKAR.IS",
+    "THYAO.IS",
+    "ALARK.IS",
+    "HEKTS.IS",
+    "IEYHO.IS",
+    "SAHOL.IS",
+    "AKSA.IS",
+    "TAVHL.IS",
+    "PGSUS.IS",
+    "ARCLK.IS",
+    "SASA.IS",
+    "EREGL.IS",
+    "ISCTR.IS",
+    "EKGYO.IS",
+    "GUBRF.IS",
+    "MAVI.IS",
+    "BERA.IS",
+    "AGHOL.IS",
+    "ENJSA.IS",
+    "MPARK.IS",
+    "RALYH.IS",
+    "SOKM.IS",
+    "OYAKC.IS",
+    "TURSG.IS",
+    "KONTR.IS",
+    "TUREX.IS",
+    "CANTE.IS",
+    "GENIL.IS",
+    "GESAN.IS",
+    "YEOTK.IS",
+    "MAGEN.IS",
+    "MIATK.IS",
+    "GRSEL.IS",
+    "SMRTG.IS",
+    "KCAER.IS",
+    "ALFAS.IS",
+    "ASTOR.IS",
+    "EUPWR.IS",
+    "CWENE.IS",
+    "KTLEV.IS",
+    "PASEU.IS",
+    "ENERY.IS",
+    "REEDR.IS",
+    "TABGD.IS",
+    "BINHO.IS",
+    "AVPGY.IS",
+    "LMKDC.IS",
+    "OBAMS.IS",
+    "ALTNY.IS",
+    "EFORC.IS",
+    "GRTHO.IS",
+    "GLRMK.IS",
+    "DSTKF.IS",
+    "BALSU.IS",
 ]
