@@ -12,6 +12,8 @@ from Yahoo Finance using a clean CLI with configurable `--range` and `--interval
 ```bash
 conda create -n bist100 python=3.11 -y
 conda activate bist100
+python --version                     # verify 3.11.x
+pip install --upgrade pip setuptools wheel
 pip install -e ".[dev]"
 ruff check .
 black .
