@@ -23,6 +23,7 @@ pytest -q
 ## Run
 ```bash
 python -m bist_extractor.cli --range 1y --interval 1d
+python -m bist_extractor.cli --range 1y --interval 4h
 python -m bist_extractor.cli --range 120d --interval 60m
 python -m bist_extractor.cli --range 60d --interval 30m
 python -m bist_extractor.cli --range 12d --interval 5m
