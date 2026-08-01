@@ -1,4 +1,4 @@
-![Python](https://img.shields.io/badge/Python-3.10-blue) ![Data](https://img.shields.io/badge/Data-OHLCV%20Pipeline-green) ![Database](https://img.shields.io/badge/Database-SQLite-blue)
+![Python](https://img.shields.io/badge/Python-3.10-blue) ![Data](https://img.shields.io/badge/Data-OHLCV%20Pipeline-green) ![Database](https://img.shields.io/badge/Database-SQLite-lightgrey)
 
 # BIST100 Extractor
 
