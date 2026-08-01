@@ -1,3 +1,5 @@
+![Python](https://img.shields.io/badge/Python-3.10-blue) ![License](https://img.shields.io/badge/License-Apache--2.0-orange) ![Data](https://img.shields.io/badge/Data-OHLCV%20Pipeline-green)
+
 # BIST100 Extractor
 
 A simple, reproducible pipeline to download OHLCV time series for **BIST 100** tickers
