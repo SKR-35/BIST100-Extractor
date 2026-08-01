@@ -9,7 +9,9 @@ data/
 *.egg-info/
 dist/
 build/
+logs/
 *.db
 *.sqlite
 *.xlsx
 *.csv
+*.bat
