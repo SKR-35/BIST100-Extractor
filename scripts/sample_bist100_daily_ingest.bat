@@ -77,16 +77,14 @@ echo END %DATE% %TIME% >> "%LOG_FILE%"
 echo EXIT_CODE=%EXITCODE% >> "%LOG_FILE%"
 
 
-if not "%EXITCODE%"=="0" (
+if "%EXITCODE%"=="0" (
+    echo JOB SUCCESS
+    echo Log:
+    echo %LOG_FILE%
+) else (
     echo JOB FAILED
     echo See log:
     echo %LOG_FILE%
-    exit /b %EXITCODE%
 )
-
-
-echo JOB SUCCESS
-echo Log:
-echo %LOG_FILE%
 
 endlocal & exit /b %EXITCODE%
