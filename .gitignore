@@ -14,4 +14,4 @@ logs/
 *.sqlite
 *.xlsx
 *.csv
-*.bat
+bist100_daily_ingest.bat
